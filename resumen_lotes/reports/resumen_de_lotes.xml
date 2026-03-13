@@ -1,0 +1,266 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="resumen_lotes_report">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc"> 
+                <t t-call="web.external_layout">
+    
+                    <style>
+                        .compact-report-table tr td {
+                        padding: 3px 5px !important;
+                        line-height: 1.2 !important;
+                        vertical-align: top !important;
+                        }
+                        .compact-report-table tr {
+                        height: auto !important;
+                        min-height: 22px !important;
+                        }
+                        .compact-report-table {
+                        margin-bottom: 5px !important;
+                        }
+                        .employee-data-line {
+                        padding: 4px 0 !important;
+                        }
+                        .total-row {
+                        background-color: #f8f9fa !important;
+                        }
+                        .subtotal-row {
+                        background-color: #e9ecef !important;
+                        font-weight: bold !important;
+                        }
+                        .department-header {
+                        background-color: #d1e7ff !important;
+                        font-weight: bold !important;
+                        font-size: 1.1em !important;
+                        }
+                        .department-total {
+                        background-color: #cfe2ff !important;
+                        font-weight: bold !important;
+                        }
+                        .amount-cell {
+                        text-align: right !important;
+                        padding-right: 15px !important;
+                        }
+                        .total-label {
+                        text-align: right !important;
+                        padding-right: 10px !important;
+                        }
+                        .grand-total-row {
+                        background-color: #f8f9fa !important;
+                        font-weight: bold !important;
+                        }
+                    </style>
+                    <div class="page">
+                        <t t-if="doc.slip_ids and doc.slip_ids[0].struct_id">
+                            <h3 t-field="doc.slip_ids[0].struct_id.name" class="text-center"/>
+                        </t>
+                        <t t-else="">
+                            <span>Nómina</span>
+                        </t>
+                        <div class="oe_structure">
+                            <div style="margin-bottom: 10px; text-align: center;">
+                                <span t-field="doc.name" class="h5-fs"/> 
+                                <br/>del <span t-field="doc.date_start"/> hasta el <span t-field="doc.date_end"/>. 
+                                <br/>Tasa de cambio: <span t-field="doc.x_tasa_nom"/>
+                                <br/>Recibos: <span t-field="doc.payslip_count"/>
+                            </div>
+                            <table class="table table-sm compact-report-table">
+                                <tbody>
+                                    <t t-set="gran_total_general" t-value="0"/>
+                                    <t t-set="total_asignaciones_general" t-value="0"/>
+                                    <t t-set="total_deducciones_general" t-value="0"/>
+                                    <t t-set="departments" t-value="{}"/>
+                                    <t t-foreach="doc.slip_ids" t-as="x2many_record">
+                                        <t t-set="dept_name" t-value="x2many_record.department_id.name or 'Sin Departamento'"/>
+                                        <t t-if="dept_name not in departments">
+                                            <t t-set="departments" t-value="{**departments, **{dept_name: []}}"/>
+                                        </t>
+                                        <t t-set="departments" t-value="{**departments, **{dept_name: [*departments[dept_name], x2many_record]}}"/>
+                                    </t>
+                                    
+                                    <t t-foreach="sorted(departments.items())" t-as="dept">
+                                        <t t-set="dept_name" t-value="dept[0]"/>
+                                        <t t-set="dept_employees" t-value="dept[1]"/>
+                                        <t t-set="dept_total" t-value="0"/>
+                                        <t t-set="dept_asignaciones" t-value="0"/>
+                                        <t t-set="dept_deducciones" t-value="0"/>
+                                        
+                                        <!-- Cabecera de departamento -->
+                                        <tr class="department-header">
+                                            <td colspan="5">
+                                                <i class="fa fa-building-o"/> Departamento: 
+                                                <span t-esc="dept_name"/>
+                                            </td>
+                                        </tr>
+                                        
+                                        <!-- Empleados del departamento -->
+                                        <t t-foreach="dept_employees" t-as="x2many_record">
+
+                                            <tr class="o_small_twelve-fs" style="border-style: none; background-color: #050599; color: #ff9;">
+                                                <th colspan="2" style="text-align: left;">
+                                                    <!--<span>Empleado: </span> -->
+                                                    <span class="base-fs">→ </span><span class="color-header">Empleado: </span> <strong> <span style="color: white; font-weight: bolder;" name="value" t-field="x2many_record.employee_id.name"/> </strong>
+                                                </th>
+                                                <th colspan="1" style="text-align: right;">
+                                                    <span class="color-header">   Cédula: </span>
+                                                    <span style="color: white; font-weight: bolder;" t-field="x2many_record.employee_id.identification_id"/>
+                                                </th>
+                                                <th colspan="1" style="text-align: right;">
+                                                    <span class="color-header">   S. Diario: </span>
+                                                    <span style="color: white; font-weight: bolder;" t-esc="(x2many_record.contract_id.wage + ((x2many_record.contract_id.x_salario_usd if x2many_record.contract_id.x_salario_usd > 0 else (x2many_record.contract_id.x_efectivo_usd or 0)) * (doc.x_tasa_nom or 1) ))  / 30" t-options="{'widget': 'monetary', 'display_currency': x2many_record.company_id.currency_id}"/>
+                                                </th>
+                                                <th colspan="1" style="text-align: right;">
+                                                    <span class="color-header">   S. Mensual: </span>
+                                                    <!-- <span t-esc="x2many_record.contract_id.wage + ((x2many_record.contract_id.x_efectivo_usd or 0) + (x2many_record.contract_id.x_salario_usd or 0)) * (doc.x_tasa_nom or 1)" t-options="{'widget': 'monetary', 'display_currency': x2many_record.company_id.currency_id}"/> -->
+                                                    <span style="color: white; font-weight: bolder;" t-esc="x2many_record.contract_id.wage + (
+                                                                (x2many_record.contract_id.x_salario_usd if x2many_record.contract_id.x_salario_usd > 0 
+                                                                else (x2many_record.contract_id.x_efectivo_usd or 0)) 
+                                                                 * (doc.x_tasa_nom or 1)
+                                                                )" t-options="{'widget': 'monetary', 'display_currency': x2many_record.company_id.currency_id}"/>
+                                                </th>
+                                            </tr>
+                                            
+                                            <tr class="o_small_twelve-fs" style="border-style: none;">
+                                                <th colspan="1" style="text-align: left;">
+                                                    <span class="color-header"> Cargo: </span>
+                                                    <span style="color: blue;"  t-field="x2many_record.employee_id.job_id"/>
+                                                    <!--<span t-field="x2many_record.employee_id.job_id.name"/> -->
+                                                </th>
+                                                <th colspan="3" style="text-align: left;">
+                                                    <span class="color-header">  Cta Bancaria: </span>
+                                                    <span style="color: blue;" t-field="x2many_record.employee_id.bank_account_id"/>
+                                                </th>
+                                                <th colspan="1" style="text-align: right;">
+                                                    <span class="color-header"> F. Ingreso: </span>
+                                                    <span style="color: blue; font-weight: bolder;" t-field="x2many_record.employee_id.x_fecha_ingreso"/>
+                                                    
+                                                </th>
+                                            </tr>
+                                            <tr>
+                                                <th colspan="5" style="text-align: center;">
+                                                    <strong> 
+                                                        <t t-set="q051_data" t-value="''"/>
+                                                        <t t-foreach="x2many_record.line_ids" t-as="line">
+                                                            <t t-if="line.salary_rule_id.code == 'Q051' and line.amount &gt; 0">
+                                                                <t t-set="q051_data" t-value="line.name[:50]"/>
+                                                            </t>
+                                                        </t>
+                                                        <span style="color: red;" t-esc="q051_data or ' '"/>
+                                                    </strong>
+                                                </th>
+                                            </tr>
+                                                
+                                            
+                                            <!-- Encabezado del cuerpo -->
+                                            <tr style="color: #aaa;" class="border-bottom border-top-0 border-start-0 border-end-0 border-2 border-dark fw-bold">
+                                                <th style="width: 30%;">Concepto</th>
+                                                <th style="width: 10%;">Referencia</th>
+                                                <th class="amount-cell" style="width: 20%;">Asignaciones</th>
+                                                <th class="amount-cell" style="width: 20%;">Deducciones</th>
+                                                <th class="amount-cell" style="width: 20%;">Neto</th>
+                                            </tr>
+                                            
+                                            <!-- Líneas de nómina del empleado -->
+                                            <t t-set="total_neto_trabajador" t-value="0"/>
+                                            <t t-set="total_deducciones" t-value="0"/>
+                                            <t t-set="total_asignaciones" t-value="0"/>
+                                            
+                                            <t t-foreach="sorted(x2many_record.line_ids, key=lambda x: x.salary_rule_id.code)" t-as="line">
+                                                <t t-set="cat_code" t-value="line.salary_rule_id.category_id.code"/>
+                                                <t t-if="cat_code in ['BASIC', 'ASIG', 'ALW', 'BONO'] or cat_code in ['DED', 'RET']">
+                                                    <tr>
+                                                        <td>
+                                                            <span t-esc="line.salary_rule_id.code[:4] + ' - ' + line.salary_rule_id.name" class="o_small_twelve-fs"/>
+                                                        </td>
+                                                        <td class="amount-cell">
+                                                            <span class="o_small_twelve-fs" t-field="line.name"/>
+                                                        </td>
+                                                        <!-- Columna Asignaciones -->
+                                                        <td class="amount-cell">
+                                                            <t t-if="cat_code in ['BASIC', 'ASIG', 'ALW', 'BONO']">
+                                                                <span class="o_small_twelve-fs" t-esc="line.amount" t-options="{'widget': 'monetary', 'display_currency': line.slip_id.company_id.currency_id}"/>
+                                                            </t>
+                                                        </td>
+                                                        <!-- Columna Deducciones -->
+                                                        <td class="amount-cell">
+                                                            <t t-if="cat_code in ['DED', 'RET']">
+                                                                <span class="o_small_twelve-fs" t-esc="line.amount" t-options="{'widget': 'monetary', 'display_currency': line.slip_id.company_id.currency_id}"/>
+                                                            </t>
+                                                        </td>
+                                                        <!-- Columna Neto (vacía por línea) -->
+                                                        <td class="amount-cell o_small_twelve-fs"/>
+                                                    </tr>
+                                                    <!-- Actualizar totales -->
+                                                    <t t-if="cat_code in ['BASIC', 'ASIG', 'ALW', 'BONO']">
+                                                        <t t-set="total_asignaciones" t-value="total_asignaciones + line.amount"/>
+                                                        <t t-set="dept_asignaciones" t-value="dept_asignaciones + line.amount"/>
+                                                        <t t-set="total_asignaciones_general" t-value="total_asignaciones_general + line.amount"/>
+                                                    </t>
+                                                    <t t-if="cat_code in ['DED', 'RET']">
+                                                        <t t-set="total_deducciones" t-value="total_deducciones + line.amount"/>
+                                                        <t t-set="dept_deducciones" t-value="dept_deducciones + line.amount"/>
+                                                        <t t-set="total_deducciones_general" t-value="total_deducciones_general + line.amount"/>
+                                                    </t>
+                                                    <t t-set="total_neto_trabajador" t-value="total_asignaciones - total_deducciones"/>
+                                                </t>
+                                            </t>
+                                            
+                                            <!-- Fila de total por empleado -->
+                                            <tr class="total-row">
+                                                <td colspan="2" style="text-align: right; font-weight: bold;">Totales:</td>
+                                                <td class="amount-cell">
+                                                    <span t-esc="total_asignaciones" t-options="{'widget': 'monetary', 'display_currency': x2many_record.company_id.currency_id}"/>
+                                                </td>
+                                                <td class="amount-cell">
+                                                    <span t-esc="total_deducciones" t-options="{'widget': 'monetary', 'display_currency': x2many_record.company_id.currency_id}"/>
+                                                </td>
+                                                <td class="amount-cell">
+                                                    <span t-esc="total_neto_trabajador" t-options="{'widget': 'monetary', 'display_currency': x2many_record.company_id.currency_id}"/>
+                                                </td>
+                                            </tr>
+                                            
+                                            <!-- Acumular totales de departamento y general -->
+                                            <t t-set="dept_total" t-value="dept_total + total_neto_trabajador"/>
+                                            <t t-set="gran_total_general" t-value="gran_total_general + total_neto_trabajador"/>
+                                        </t>
+                                        
+                                        <!-- Fila de total por departamento -->
+                                        <tr class="department-total">
+                                            <td colspan="2" style="text-align: right; font-weight: bold;">Total Departamento:</td>
+                                            <td class="amount-cell">
+                                                <span t-esc="dept_asignaciones" t-options="{'widget': 'monetary', 'display_currency': doc.company_id.currency_id}"/>
+                                            </td>
+                                            <td class="amount-cell">
+                                                <span t-esc="dept_deducciones" t-options="{'widget': 'monetary', 'display_currency': doc.company_id.currency_id}"/>
+                                            </td>
+                                            <td class="amount-cell">
+                                                <span t-esc="dept_total" t-options="{'widget': 'monetary', 'display_currency': doc.company_id.currency_id}"/>
+                                            </td>
+                                        </tr>
+                                        
+                                        <!-- Espaciado entre departamentos -->
+                                        <tr><td colspan="5" style="height: 10px;"/></tr>
+                                    </t>
+                                    
+                                    <!-- Fila de gran total general -->
+                                    <tr class="grand-total-row">
+                                        <td colspan="2" style="text-align: right; font-weight: bold;">GRAN TOTAL GENERAL:</td>
+                                        <td class="amount-cell">
+                                            <span t-esc="total_asignaciones_general" t-options="{'widget': 'monetary', 'display_currency': doc.company_id.currency_id}"/>
+                                        </td>
+                                        <td class="amount-cell">
+                                            <span t-esc="total_deducciones_general" t-options="{'widget': 'monetary', 'display_currency': doc.company_id.currency_id}"/>
+                                        </td>
+                                        <td class="amount-cell">
+                                            <span t-esc="gran_total_general" t-options="{'widget': 'monetary', 'display_currency': doc.company_id.currency_id}"/>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

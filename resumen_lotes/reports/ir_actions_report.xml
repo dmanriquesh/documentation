@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <record id="action_payroll_monthly_report" model="ir.actions.report"> 
+        <field name="name">Resumen de Lotes (Pre - Nómina)</field>
+        <field name="model">hr.payslip.run</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">resumen_lotes.resumen_lotes_report</field>
+        <field name="print_report_name">'Resumen de Lotes (Pre - Nómina) - %s' % (object.name)</field>
+    </record>
+  </data>
+</odoo>
